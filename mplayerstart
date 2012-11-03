@@ -67,7 +67,7 @@ help () {
 		tvx="$tvoption"
 	fi
 	cat << EOF
-mplayerstart version 1.4.1
+mplayerstart version 1.4.2
 Creates resume file for resumable playback; disables X, KDE, and Gnome
 screensavers; restores last volume levels; starts mplayer in full-screen
 mode; sends output to selected display.
@@ -92,6 +92,7 @@ Options:
 --resumelast        resumes playing last played media file
 --resumepre         resumes playing previous-to-last played media file
 --rewind            deletes last played resume file
+--create-rc         create user options file
 --mopt "OPTIONS"    passes additional playback OPTIONS to mplayer
 Note: Resume files are auto-deleted after 60 days.
 Current data folder for resume files: $data
@@ -103,6 +104,65 @@ http://igurublog.wordpress.com/downloads/script-mplayerstart/
 
 EOF
 	exit
+}
+
+
+create-rc () {
+    # create default user rc 
+	cat > $mplayerstartrc << EOF
+## Location of resume files and temp files; approx 100MB free space required
+#data=
+
+## Optional: Parent folder(s) of your audio & video files for
+##           searching for moved resumes
+##           If you pass a .resume file to mplayerstart which contains
+##           an invalid location for the media file (perhaps you moved it),
+##           mplayerstart will recursively search these folders for the file
+#search1=
+#search2=
+
+## Default mplayer video options
+#moptions= -vo xv -idx -fs -alang en
+
+## Audio Playback Options
+#guiplayer=gmplayer
+
+## TV Mode Options
+## use this for a single xinerama desktop (typical dual-head setup in KDE4):
+##tvoption= -xineramascreen 2
+## OR use this for a separate X display:
+#tvoption= -display :1
+
+## xinit
+## set xinitlayout to xorg.conf's Serverlayout identifier for TV if you want
+##   mplayerstart to xinit a new X display for tv mode
+##   see http://en.wikibooks.org/wiki/NVidia/TV-OUT
+##   does not work with tvmode=auto; no resume file will be saved
+##   press 'q' to quit or Ctrl-Alt-F7 to return to monitor
+#xinitlayout=tv
+## X display to start (only works if xinitlayout is also set):		
+#xinitdisplay=:1
+
+## Volume Restoration Options - see 'amixer' output to adjust if needed
+## requires amixer (alsa-lib)
+## primary amixer control and channel
+#master=Master							
+#masterchannel=Mono: Playback
+## secondary amixer control and channel
+#pcm=PCM
+#pcmchannel=Front Right: Playback
+
+## Pop-up Options
+## Requires zenity, Xdialog, or kdialog
+## set to "Z" for Zenity, "X" for Xdialog, "K" for kdialog, or "" for no pop-ups
+#dialogtype=Z
+## specify optional custom GTK rc files for Zenity or Xdialog pop-up themes
+## green provides info, red provides error message
+#greenrcfile=
+#redrcfile=
+EOF
+    echo "$mplayerstartrc created"
+    exit
 }
 
 saveroff () {
@@ -198,6 +258,16 @@ seektime=""
 rx=0
 mopt=""
 
+# read option from user rc file
+mplayerstartrc="$data/mplayerstartrc"
+if [ -f $mplayerstartrc ]; then
+    shopt -s extglob
+    while IFS='= ' read left right
+    do
+        declare $left="$right"
+    done < <(cat "$mplayerstartrc" | egrep -v '^#|^$'| egrep '=')
+fi
+
 # parse command line
 index=0
 while [ "$1" != "" ];
@@ -230,6 +300,9 @@ do
 			--rewind )
 				rewind=1
 				;;
+			--create-rc )
+              create-rc         
+                ;;
 			--mopt )
 				if [ "$mopt" != "" ]; then
 					echo "Only one --mopt is permitted"
